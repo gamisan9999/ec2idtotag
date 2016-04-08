@@ -2,10 +2,13 @@ package main
 
 /***************************************************************************************************
 ec2idtotag
-機能: 指定したEC2インスタンスIDに割り当てられているtag keyよりtag valueを取得する(完全一致)
+機能: 指定したEC2インスタンスIDに割り当てられているtag keyよりtag valueを表示する(完全一致)
 
-$ ./ec2vpc_linux_amd64 --instance-id `curl -s http://169.254.169.254/latest/meta-data/instance-id`
+(1)IAM Role利用(自インスタンス稼働リージョン)
+$ ./ec2idtotag --instance-id `curl -s http://169.254.169.254/latest/meta-data/instance-id`
 vpc-XXXXXXXX
+(2)credentials利用
+$ ./ec2idtotag --instance-id i-XXXXXXXX -p <shared credentials> -r <region>
 ***************************************************************************************************/
 
 import (
