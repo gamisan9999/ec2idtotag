@@ -10,10 +10,13 @@ vpc-XXXXXXXX
 
 import (
 	"fmt"
+	"net/http"
 	"os"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -54,7 +57,6 @@ func getTagValueFromInstanceID(svc *ec2.EC2, s string, tagKey string) {
 
 func getRegionFromInstanceMetaData() (region string) {
 	metadata := ec2metadata.New(session.New())
-	fmt.Println("all metadata", metadata.Available())
 	region, err := metadata.Region()
 	if err != nil {
 		panic(err)
@@ -76,7 +78,7 @@ func main() {
 			Destination: &instanceID,
 		},
 		cli.StringFlag{
-			Name:        "tagkey, -t",
+			Name:        "tagkey, t",
 			Value:       "Name",
 			Usage:       "--tagkey Name",
 			Destination: &tagKey,
@@ -95,30 +97,24 @@ func main() {
 		},
 	}
 	app.Action = func(c *cli.Context) {
-		if c.String("region") == "" {
-			region = getRegionFromInstanceMetaData()
-		}
-		/*
-			var creds *credentials.Credentials
-
-				fmt.Println("hoge", credentials.NewCredentials(&ec2rolecreds.EC2RoleProvider{}))
-				creds = credentials.NewCredentials(&ec2rolecreds.EC2RoleProvider{})
-				fmt.Println("とおった", creds)
-				credsVal, err := creds.Get()
-				fmt.Println("エラー", err)
-				//		fmt.Println(credsVal.SessionToken, credsVal.AccessKeyID, credsVal.SecretAccessKey)
-
-				if err != nil {
-					fmt.Println("aaaa")
-					fmt.Println(credsVal)
-					panic(err)
-				}
-
-				config := aws.NewConfig().WithCredentials(creds).WithRegion(region)
-		*/
-		config := &aws.Config{
-			Credentials: credentials.NewSharedCredentials("", profile),
-			Region:      aws.String(region),
+		var config *aws.Config
+		if c.String("profile") == "" {
+			if c.String("region") == "" {
+				region = getRegionFromInstanceMetaData()
+			}
+			ec2m := ec2metadata.New(session.New(), &aws.Config{
+				HTTPClient: &http.Client{Timeout: 10 * time.Second},
+			})
+			creds := credentials.NewCredentials(&ec2rolecreds.EC2RoleProvider{
+				Client: ec2m,
+			})
+			// IAM Role
+			config = aws.NewConfig().WithCredentials(creds).WithRegion(region)
+		} else {
+			config = &aws.Config{
+				Credentials: credentials.NewSharedCredentials("", profile),
+				Region:      aws.String(region),
+			}
 		}
 
 		if c.String("instance-id") != "" {
